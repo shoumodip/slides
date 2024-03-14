@@ -244,6 +244,9 @@ int main(int argc, char **argv) {
     slidesLoad(&slides, &text, &paths, argv[1]);
   }
 
+  const char *message = "Drag and Drop slideshow file";
+  size_t messageWidth = MeasureTextEx(fontsGet(&fonts, FONT_BASE), message, FONT_BASE, 0).x;
+
   size_t current = 0;
   while (!WindowShouldClose()) {
     int w = GetScreenWidth();
@@ -252,14 +255,10 @@ int main(int argc, char **argv) {
     BeginDrawing();
     ClearBackground(RAYWHITE);
     if (slides.count == 0) {
-      Font font = fontsGet(&fonts, FONT_BASE);
-      const char *message = "Drag and Drop slideshow file";
-
-      size_t width = MeasureTextEx(font, message, FONT_BASE, 0).x;
-      float scale = min(w * VIEWPORT / width, h * VIEWPORT / FONT_BASE);
+      float scale = min(w * VIEWPORT / messageWidth, h * VIEWPORT / FONT_BASE);
       size_t size = FONT_BASE * scale;
       Vector2 position = {
-        .x = (w - width * scale) / 2.0,
+        .x = (w - messageWidth * scale) / 2.0,
         .y = (h - size) / 2.0,
       };
 
