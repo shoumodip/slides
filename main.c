@@ -6,7 +6,7 @@
 
 // Comparisons
 #define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
+#define diff(a, b) ((a) > (b) ? ((a) - (b)) : ((b) - (a)))
 
 // List
 #define LIST_INIT_CAP 128
@@ -75,7 +75,7 @@ typedef struct {
 Font fontsGet(Fonts *fs, size_t size) {
   for (size_t i = 0; i < fs->count; i++) {
     Font f = fs->data[i];
-    if (f.baseSize == size) {
+    if (diff(f.baseSize, size) <= 5) {
       return f;
     }
   }
