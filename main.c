@@ -75,7 +75,7 @@ typedef struct {
 Font fontsGet(Fonts *fs, size_t size) {
   for (size_t i = 0; i < fs->count; i++) {
     Font f = fs->data[i];
-    if (diff(f.baseSize, size) <= 5) {
+    if (diff(f.baseSize, size) <= 20) {
       return f;
     }
   }
@@ -88,6 +88,10 @@ Font fontsGet(Fonts *fs, size_t size) {
   }
 
   Font f = LoadFontFromMemory(".ttf", font, font_len, size, 0, 0);
+  if (IsFontReady(f)) {
+    GenTextureMipmaps(&f.texture);
+    SetTextureFilter(f.texture, TEXTURE_FILTER_TRILINEAR);
+  }
   listAppend(fs, f);
   return f;
 }
@@ -124,6 +128,10 @@ void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
     if (!s->ready) {
       s->ready = true;
       s->image = LoadTexture(paths->data + s->start);
+      if (IsTextureReady(s->image)) {
+        GenTextureMipmaps(&s->image);
+        SetTextureFilter(s->image, TEXTURE_FILTER_TRILINEAR);
+      }
     }
 
     float scale = min(w * VIEWPORT / s->image.width, h * VIEWPORT / s->image.height);
