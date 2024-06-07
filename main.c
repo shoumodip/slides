@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+
 #include "fonts/DMSans-Regular.c"
 
 // Comparisons
@@ -110,38 +112,41 @@ typedef struct {
   size_t width;
 } Text;
 
+typedef enum {
+  SLIDE_TEXT,
+  SLIDE_IMAGE,
+  SLIDE_TEXTURE,
+} SlideType;
+
 typedef struct {
   bool ready;
-  bool picture;
   size_t start;
+
+  SlideType type;
   union {
     Text text;
-    Texture image;
+    Image image;
+    Texture texture;
   };
 } Slide;
+
+void slideFree(Slide *s) {
+  if (s->ready) {
+    if (s->type == SLIDE_IMAGE) {
+      UnloadImage(s->image);
+    }
+
+    if (s->type == SLIDE_TEXTURE) {
+      UnloadTexture(s->texture);
+    }
+  }
+}
 
 void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
   int w = GetScreenWidth();
   int h = GetScreenHeight();
 
-  if (s->picture) {
-    if (!s->ready) {
-      s->ready = true;
-      s->image = LoadTexture(paths->data + s->start);
-      if (IsTextureReady(s->image)) {
-        GenTextureMipmaps(&s->image);
-        SetTextureFilter(s->image, TEXTURE_FILTER_TRILINEAR);
-      }
-    }
-
-    float scale = min(w * VIEWPORT / s->image.width, h * VIEWPORT / s->image.height);
-    Vector2 position = {
-      .x = (w - s->image.width * scale) / 2.0,
-      .y = (h - s->image.height * scale) / 2.0,
-    };
-
-    DrawTextureEx(s->image, position, 0, scale, WHITE);
-  } else {
+  if (s->type == SLIDE_TEXT) {
     if (!s->ready) {
       s->ready = true;
       s->text.width = 0;
@@ -172,6 +177,27 @@ void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
       position.y += size;
       p += strlen(p) + 1;
     }
+  } else {
+    if (s->type == SLIDE_IMAGE && s->ready) {
+      Texture texture = LoadTextureFromImage(s->image);
+      UnloadImage(s->image);
+
+      GenTextureMipmaps(&texture);
+      SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
+
+      s->type = SLIDE_TEXTURE;
+      s->texture = texture;
+    }
+
+    if (s->type == SLIDE_TEXTURE) {
+      float scale = min(w * VIEWPORT / s->texture.width, h * VIEWPORT / s->texture.height);
+      Vector2 position = {
+        .x = (w - s->texture.width * scale) / 2.0,
+        .y = (h - s->texture.height * scale) / 2.0,
+      };
+
+      DrawTextureEx(s->texture, position, 0, scale, WHITE);
+    }
   }
 }
 
@@ -179,9 +205,34 @@ typedef struct {
   Slide *data;
   size_t count;
   size_t capacity;
+
+  Buffer paths;
+  pthread_t thread;
 } Slides;
 
-void slidesLoad(Slides *s, Buffer *text, Buffer *paths, const char *file) {
+void *slidesLoad(void *arg) {
+  Slides *s = arg;
+
+  for (size_t i = 0; i < s->count; i++) {
+    Slide *slide = &s->data[i];
+    if (slide->type == SLIDE_IMAGE) {
+      slide->image = LoadImage(s->paths.data + slide->start);
+      slide->ready = true;
+    }
+  }
+
+  return NULL;
+}
+
+void slidesStopLoader(Slides *s) {
+  if (s->thread) {
+    pthread_cancel(s->thread);
+    pthread_join(s->thread, NULL);
+    s->thread = 0;
+  }
+}
+
+void slidesParse(Slides *s, Buffer *text, const char *file) {
   int count;
   unsigned char *data = LoadFileData(file, &count);
   if (!data) {
@@ -197,17 +248,17 @@ void slidesLoad(Slides *s, Buffer *text, Buffer *paths, const char *file) {
 
     Slide slide = {0};
     if (*line.data == '@') {
-      slide.picture = true;
-      slide.start = paths->count;
+      slide.type = SLIDE_IMAGE;
+      slide.start = s->paths.count;
 
-      listAppendMany(paths, line.data + 1, line.count - 1);
-      listAppend(paths, '\0');
+      listAppendMany(&s->paths, line.data + 1, line.count - 1);
+      listAppend(&s->paths, '\0');
 
       while (line.count) {
         line = strSplit(&content, '\n');
       }
     } else {
-      slide.picture = false;
+      slide.type = SLIDE_TEXT;
       slide.start = text->count;
 
       while (line.count) {
@@ -235,6 +286,10 @@ void slidesLoad(Slides *s, Buffer *text, Buffer *paths, const char *file) {
   }
 
   UnloadFileData(data);
+
+  if (pthread_create(&s->thread, NULL, slidesLoad, s)) {
+    TraceLog(LOG_ERROR, "Could not start loader thread");
+  }
 }
 
 // Main
@@ -245,11 +300,10 @@ int main(int argc, char **argv) {
 
   Fonts fonts = {0};
   Buffer text = {0};
-  Buffer paths = {0};
   Slides slides = {0};
 
   if (argc == 2) {
-    slidesLoad(&slides, &text, &paths, argv[1]);
+    slidesParse(&slides, &text, argv[1]);
   }
 
   const char *message = "Drag and Drop slideshow file";
@@ -272,7 +326,7 @@ int main(int argc, char **argv) {
 
       DrawTextEx(fontsGet(&fonts, size), message, position, size, 0, BLACK);
     } else {
-      slideDraw(&slides.data[current], &fonts, &text, &paths);
+      slideDraw(&slides.data[current], &fonts, &text, &slides.paths);
     }
     EndDrawing();
 
@@ -309,19 +363,28 @@ int main(int argc, char **argv) {
       FilePathList list = LoadDroppedFiles();
 
       if (list.count > 0) {
+        slidesStopLoader(&slides);
+
         current = 0;
         text.count = 0;
-        paths.count = 0;
+        slides.paths.count = 0;
+
+        for (size_t i = 0; i < slides.count; i++) {
+          slideFree(&slides.data[i]);
+        }
         slides.count = 0;
-        slidesLoad(&slides, &text, &paths, list.paths[0]);
+
+        slidesParse(&slides, &text, list.paths[0]);
       }
 
       UnloadDroppedFiles(list);
     }
   }
 
+  slidesStopLoader(&slides);
+
   free(text.data);
-  free(paths.data);
+  free(slides.paths.data);
 
   for (size_t i = 0; i < fonts.count; i++) {
     UnloadFont(fonts.data[i]);
@@ -329,10 +392,7 @@ int main(int argc, char **argv) {
   free(fonts.data);
 
   for (size_t i = 0; i < slides.count; i++) {
-    Slide s = slides.data[i];
-    if (s.picture) {
-      UnloadTexture(s.image);
-    }
+    slideFree(&slides.data[i]);
   }
   free(slides.data);
 

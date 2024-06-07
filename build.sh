@@ -2,5 +2,7 @@
 
 set -xe
 
-xxd -a -i -n font fonts/DMSans-Regular.ttf > fonts/DMSans-Regular.c
-cc `pkg-config --cflags raylib` -o slides main.c `pkg-config --libs raylib` -lraylib -lm
+FONT="fonts/DMSans-Regular"
+[ -f "$FONT.c" ] || xxd -a -i -n font "$FONT.ttf" > "$FONT.c"
+
+cc `pkg-config --cflags raylib` -o slides main.c `pkg-config --libs raylib` -lm -lpthread -lraylib
