@@ -1,2 +1,4 @@
 slides
-fonts/DMSans-Regular.c
+fonts/*.c
+thirdparty/*
+!thirdparty/*.sh

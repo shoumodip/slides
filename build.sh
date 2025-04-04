@@ -1,8 +1,9 @@
 #!/bin/sh
 
-set -xe
+[ -d thirdparty/raylib ] || ./thirdparty/raylib.sh
 
-FONT="fonts/DMSans-Regular"
-[ -f "$FONT.c" ] || xxd -a -i -n font "$FONT.ttf" > "$FONT.c"
+echo "[INFO] Generating font header"
+xxd -a -i -n font fonts/DMSans-Regular.ttf > fonts/DMSans-Regular.c
 
-cc `pkg-config --cflags raylib` -o slides main.c `pkg-config --libs raylib` -lm -lpthread -lraylib
+echo "[INFO] Building slides"
+cc -Ithirdparty/raylib/include -o slides main.c -lm -lpthread -Lthirdparty/raylib/lib -l:libraylib.a
