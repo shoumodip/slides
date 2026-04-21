@@ -1,4 +1,3 @@
-#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -135,7 +134,7 @@ typedef struct {
 } Slide;
 
 void slideFree(Slide *s) {
-    if (atomic_load(&s->ready)) {
+    if (s->ready) {
         if (s->type == SLIDE_IMAGE) {
             UnloadImage(s->image);
         }
@@ -203,7 +202,7 @@ void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
             position.y += size;
             p += strlen(p) + 1;
         }
-    } else if (atomic_load(&s->ready)) {
+    } else if (s->ready) {
         if (s->type == SLIDE_IMAGE) {
             Texture texture = LoadTextureFromImage(s->image);
             UnloadImage(s->image);
@@ -245,7 +244,7 @@ void *slidesLoad(void *arg) {
         Slide *slide = &s->data[i];
         if (slide->type == SLIDE_IMAGE) {
             slide->image = LoadImage(s->paths.data + slide->start);
-            atomic_store(&slide->ready, true);
+            slide->ready = true;
         }
     }
 
