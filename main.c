@@ -1,6 +1,9 @@
-#include <raylib.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <raylib.h>
+#include <raymath.h>
 
 #include <pthread.h>
 
@@ -13,32 +16,32 @@
 // List
 #define LIST_INIT_CAP 128
 
-#define listAppend(l, v)                                                                           \
-    do {                                                                                           \
-        if ((l)->count >= (l)->capacity) {                                                         \
-            (l)->capacity = (l)->capacity == 0 ? LIST_INIT_CAP : (l)->capacity * 2;                \
-            (l)->data = realloc((l)->data, (l)->capacity * sizeof(*(l)->data));                    \
-        }                                                                                          \
-                                                                                                   \
-        (l)->data[(l)->count++] = (v);                                                             \
+#define listAppend(l, v)                                                                                               \
+    do {                                                                                                               \
+        if ((l)->count >= (l)->capacity) {                                                                             \
+            (l)->capacity = (l)->capacity == 0 ? LIST_INIT_CAP : (l)->capacity * 2;                                    \
+            (l)->data = realloc((l)->data, (l)->capacity * sizeof(*(l)->data));                                        \
+        }                                                                                                              \
+                                                                                                                       \
+        (l)->data[(l)->count++] = (v);                                                                                 \
     } while (0)
 
-#define listAppendMany(l, v, c)                                                                    \
-    do {                                                                                           \
-        if ((l)->count + (c) > (l)->capacity) {                                                    \
-            if ((l)->capacity == 0) {                                                              \
-                (l)->capacity = LIST_INIT_CAP;                                                     \
-            }                                                                                      \
-                                                                                                   \
-            while ((l)->count + (c) > (l)->capacity) {                                             \
-                (l)->capacity *= 2;                                                                \
-            }                                                                                      \
-                                                                                                   \
-            (l)->data = realloc((l)->data, (l)->capacity * sizeof(*(l)->data));                    \
-        }                                                                                          \
-                                                                                                   \
-        memcpy((l)->data + (l)->count, (v), (c) * sizeof(*(l)->data));                             \
-        (l)->count += (c);                                                                         \
+#define listAppendMany(l, v, c)                                                                                        \
+    do {                                                                                                               \
+        if ((l)->count + (c) > (l)->capacity) {                                                                        \
+            if ((l)->capacity == 0) {                                                                                  \
+                (l)->capacity = LIST_INIT_CAP;                                                                         \
+            }                                                                                                          \
+                                                                                                                       \
+            while ((l)->count + (c) > (l)->capacity) {                                                                 \
+                (l)->capacity *= 2;                                                                                    \
+            }                                                                                                          \
+                                                                                                                       \
+            (l)->data = realloc((l)->data, (l)->capacity * sizeof(*(l)->data));                                        \
+        }                                                                                                              \
+                                                                                                                       \
+        memcpy((l)->data + (l)->count, (v), (c) * sizeof(*(l)->data));                                                 \
+        (l)->count += (c);                                                                                             \
     } while (0)
 
 // Str
@@ -119,8 +122,7 @@ typedef enum {
 } SlideType;
 
 typedef struct {
-    bool   ready;
-    size_t start;
+    _Atomic bool ready;
 
     SlideType type;
     union {
@@ -128,10 +130,12 @@ typedef struct {
         Image   image;
         Texture texture;
     };
+
+    size_t start;
 } Slide;
 
 void slideFree(Slide *s) {
-    if (s->ready) {
+    if (atomic_load(&s->ready)) {
         if (s->type == SLIDE_IMAGE) {
             UnloadImage(s->image);
         }
@@ -139,6 +143,28 @@ void slideFree(Slide *s) {
         if (s->type == SLIDE_TEXTURE) {
             UnloadTexture(s->texture);
         }
+    }
+}
+
+void drawSpinningCircle(Vector2 center, float size, float duration, Color color) {
+    static float timer = 0.0f;
+
+    timer += GetFrameTime();
+    if (timer >= duration) {
+        timer = 0.0f;
+    }
+
+    const float progress = timer / duration;
+    const float baseAngle = progress * 360.0f;
+
+    const size_t segments = 12;
+    const float  orbitRadius = size * 0.5f;
+    const float  dotRadius = size * 0.08f;
+
+    for (size_t i = 0; i < segments; i++) {
+        const float   angle = baseAngle + ((float) i / segments) * 360.0f;
+        const Vector2 position = Vector2Add(center, Vector2Rotate((Vector2){orbitRadius, 0}, angle * DEG2RAD));
+        DrawCircleV(position, dotRadius, Fade(color, (float) (i + 1) / segments));
     }
 }
 
@@ -177,8 +203,8 @@ void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
             position.y += size;
             p += strlen(p) + 1;
         }
-    } else {
-        if (s->type == SLIDE_IMAGE && s->ready) {
+    } else if (atomic_load(&s->ready)) {
+        if (s->type == SLIDE_IMAGE) {
             Texture texture = LoadTextureFromImage(s->image);
             UnloadImage(s->image);
 
@@ -198,6 +224,8 @@ void slideDraw(Slide *s, Fonts *fonts, Buffer *text, Buffer *paths) {
 
             DrawTextureEx(s->texture, position, 0, scale, WHITE);
         }
+    } else {
+        drawSpinningCircle((Vector2){w / 2.0, h / 2.0}, min(w, h) * 0.08, 0.6, DARKGRAY);
     }
 }
 
@@ -217,7 +245,7 @@ void *slidesLoad(void *arg) {
         Slide *slide = &s->data[i];
         if (slide->type == SLIDE_IMAGE) {
             slide->image = LoadImage(s->paths.data + slide->start);
-            slide->ready = true;
+            atomic_store(&slide->ready, true);
         }
     }
 
@@ -330,15 +358,13 @@ int main(int argc, char **argv) {
         }
         EndDrawing();
 
-        if (IsKeyPressed(KEY_J) || IsKeyPressed(KEY_L) || IsKeyPressed(KEY_DOWN) ||
-            IsKeyPressed(KEY_RIGHT)) {
+        if (IsKeyPressed(KEY_J) || IsKeyPressed(KEY_L) || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_RIGHT)) {
             if (current + 1 < slides.count) {
                 current++;
             }
         }
 
-        if (IsKeyPressed(KEY_K) || IsKeyPressed(KEY_H) || IsKeyPressed(KEY_UP) ||
-            IsKeyPressed(KEY_LEFT)) {
+        if (IsKeyPressed(KEY_K) || IsKeyPressed(KEY_H) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_LEFT)) {
             if (current > 0) {
                 current--;
             }
