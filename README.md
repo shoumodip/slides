@@ -1,11 +1,11 @@
 # Slides
-Simple Slideshow Application
+Slideshow application for Linux written in [Glos](https://github.com/glos-lang/glos).
 
 ## Quick Start
 Depends on [Raylib](https://github.com/raysan5/raylib)
 
 ```console
-$ ./build.sh
+$ glos
 $ ./slides example
 ```
 

@@ -1,4 +1,2 @@
 slides
 fonts/*.c
-thirdparty/*
-!thirdparty/*.sh

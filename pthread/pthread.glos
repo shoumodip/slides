@@ -1,0 +1,10 @@
+Pthread :: distinct u64
+
+extern {
+    #link "pthread_create"
+    create :: (this:  &Pthread, attribs: rawptr, start: ((arg: rawptr) -> rawptr), arg: rawptr) -> s32
+    #link "pthread_cancel"
+    cancel :: (this: Pthread) -> s32
+    #link "pthread_join"
+    join   :: (this: Pthread, thread_return: &rawptr) -> s32
+}

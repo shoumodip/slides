@@ -1,0 +1,170 @@
+extern {
+    #library "raylib_linux"
+
+    TraceLog :: (logLevel: TraceLogLevel, text: &char, ...)
+    InitWindow :: (width: s32, height: s32, title: &char)
+    CloseWindow :: ()
+    WindowShouldClose :: () -> bool
+    BeginDrawing :: ()
+    EndDrawing :: ()
+
+    Fade :: (color: Color, alpha: f32) -> Color
+    ClearBackground :: (color: Color)
+
+    DrawCircleV :: (center: Vector2, radius: f32, color: Color)
+
+    GetFrameTime :: () -> f32
+
+    IsKeyReleased :: (key: Key) -> bool
+    IsMouseButtonReleased :: (button: MouseButton) -> bool
+
+    LoadFontFromMemory :: (fileType: &char, fileData: &char, dataSize: s32, fontSize: s32, codepoints: &s32, codepointCount: s32) -> Font
+    IsFontValid :: (font: Font) -> bool
+    UnloadFont :: (font: Font)
+
+    DrawTextEx :: (font: Font, text: &char, position: Vector2, fontSize: f32, spacing: f32, tint: Color)
+    MeasureTextEx :: (font: Font, text: &char, fontSize: f32, spacing: f32) -> Vector2
+
+    GenTextureMipmaps :: (texture: &Texture2D)
+    SetTextureFilter :: (texture: Texture2D, filter: TextureFilter)
+    LoadTextureFromImage :: (image: Image) -> Texture2D
+    DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: f32, scale: f32, tint: Color)
+    UnloadTexture :: (font: Texture)
+
+    LoadImage :: (fileName: &char) -> Image
+    UnloadImage :: (font: Image)
+    IsImageValid :: (image: Image) -> bool
+
+    SetConfigFlags :: (flags: ConfigFlags)
+    SetExitKey :: (key: Key)
+
+    GetScreenWidth :: () -> s32
+    GetScreenHeight :: () -> s32
+    GetMousePosition :: () -> Vector2
+
+    IsFileDropped :: () -> bool
+    LoadDroppedFiles :: () -> FilePathList
+    UnloadDroppedFiles :: (files: FilePathList)
+}
+
+Vector2 :: struct {
+    x: f32
+    y: f32
+}
+
+operator + :: (this: Vector2, that: Vector2) -> Vector2 {
+    return {this.x + that.x, this.y + that.y}
+}
+
+rotate :: (this: Vector2, angle: f32) -> Vector2 {
+    cosres := cosf(angle)
+    sinres := sinf(angle)
+    return {this.x*cosres - this.y*sinres, this.x*sinres + this.y*cosres}
+
+    extern {
+        cosf :: (_: f32) -> f32
+        sinf :: (_: f32) -> f32
+    }
+}
+
+TraceLogLevel :: enum s32 {
+    ALL = 0
+    TRACE
+    DEBUG
+    INFO
+    WARNING
+    ERROR
+    FATAL
+    NONE
+}
+
+Rectangle :: struct {
+    x:      f32
+    y:      f32
+    width:  f32
+    height: f32
+}
+
+Color :: struct {
+    r: u8
+    g: u8
+    b: u8
+    a: u8
+}
+
+Font :: struct {
+    baseSize:     s32
+    glyphCount:   s32
+    glyphPadding: s32
+    texture:      Texture2D
+    recs:         &Rectangle
+    glyphs:       &GlyphInfo
+}
+
+Image :: struct {
+    data:    rawptr
+    width:   s32
+    height:  s32
+    mipmaps: s32
+    format:  s32
+}
+
+Texture :: struct {
+    id:      u32
+    width:   s32
+    height:  s32
+    mipmaps: s32
+    format:  s32
+}
+
+Texture2D :: Texture
+
+GlyphInfo :: struct {
+    value:    s32
+    offsetX:  s32
+    offsetY:  s32
+    advanceX: s32
+    image:    Image
+}
+
+
+ConfigFlags :: enum u32 {
+    WINDOW_RESIZABLE = 0x00000004
+}
+
+TextureFilter :: enum s32 {
+    POINT = 0
+    BILINEAR
+    TRILINEAR
+    ANISOTROPIC_4X
+    ANISOTROPIC_8X
+    ANISOTROPIC_16X
+}
+
+Key :: enum s32 {
+    H     = 72
+    J     = 74
+    K     = 75
+    L     = 76
+    Q     = 81
+    RIGHT = 262
+    LEFT  = 263
+    DOWN  = 264
+    UP    = 265
+}
+
+MouseButton :: enum s32 {
+    LEFT    = 0
+    RIGHT   = 1
+    MIDDLE  = 2
+    SIDE    = 3
+    EXTRA   = 4
+    FORWARD = 5
+    BACK    = 6
+}
+
+FilePathList :: struct {
+    capacity: u32
+    count:    u32
+    paths:    &&char
+}
