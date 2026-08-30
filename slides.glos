@@ -141,9 +141,7 @@ load_file :: (this: &App, path: string) {
             continue
 
         case '@'
-            image: Image
-            image.path = line[1..]
-            this.slides.push(image)
+            this.slides.push(Image {path = line[1..]})
             continue
 
         case '\\'
@@ -269,7 +267,7 @@ draw :: (this: &Slide, app: &App) {
 
         font := app.load_font(s32(size))
         for i := 0; i < s.lines.count; i += 1 {
-            rl.DrawTextEx(font, strings.to_cstring(s.lines[i]), position, size, 0.0, FOREGROUND)
+            rl.DrawTextEx(font, strings.to_cstring(s.lines[i], &arena.temporary), position, size, 0.0, FOREGROUND)
             position.y += size
         }
 
