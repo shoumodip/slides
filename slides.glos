@@ -195,6 +195,7 @@ start_worker :: (this: &App) {
     if this.thread_arena.capacity == 0 {
         this.thread_arena.capacity = 64 * 1024
     }
+    this.thread_arena.head = 0
 
     if bool(this.thread.create(null, worker, rawptr(this))) {
         rl.TraceLog(.ERROR, "Could not start worker thread. Executing it on the main thread")
