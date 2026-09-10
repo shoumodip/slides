@@ -86,8 +86,8 @@ main :: () {
                 app.stop_worker()
 
                 current = 0
-                for i := 0; i < app.slides.count; i += 1 {
-                    app.slides[i].free()
+                for _, s := range &app.slides {
+                    s.free()
                 }
                 app.slides.count = 0
 
@@ -107,13 +107,13 @@ App :: struct {
 }
 
 free :: (this: &App) {
-    for i := 0; i < this.fonts.count; i += 1 {
-        rl.UnloadFont(this.fonts[i])
+    for _, f := range this.fonts {
+        rl.UnloadFont(f)
     }
     this.fonts.free()
 
-    for i := 0; i < this.slides.count; i += 1 {
-        this.slides[i].free()
+    for _, s := range &this.slides {
+        s.free()
     }
     this.slides.free()
 
@@ -127,8 +127,8 @@ load_file :: (this: &App, path: string) {
 
     text: &Text
     for contents := string(contents); contents.count != 0 {
-        line: string; ok: bool
-        line, contents, ok = strings.split(contents, '\n')
+        line: string
+        line, contents, _ = strings.split(contents, '\n')
 
         if line.count == 0 {
             text = null
@@ -160,15 +160,14 @@ load_file :: (this: &App, path: string) {
 }
 
 load_font :: (this: &App, size: s32) -> rl.Font {
-    for i := 0; i < this.fonts.count; i += 1 {
-        f := this.fonts[i]
+    for i, f := range this.fonts {
         if diff(f.baseSize, size) <= 20 {
             return f
         }
     }
 
     if this.fonts.count > MAXIMUM_LOADED_FONTS {
-        for i := MAXIMUM_LOADED_FONTS; i < this.fonts.count; i += 1 {
+        for i := range MAXIMUM_LOADED_FONTS..this.fonts.count {
             rl.UnloadFont(this.fonts[i])
         }
         this.fonts.count = MAXIMUM_LOADED_FONTS
@@ -204,9 +203,9 @@ start_worker :: (this: &App) {
 
     worker :: (arg: rawptr) -> rawptr {
         app := &App(arg)
-        for i := 0; i < app.slides.count; i += 1 {
-            if app.slides[i] == Image {
-                image := &app.slides[i].(Image)
+        for i, s := range &app.slides {
+            if *s == Image {
+                image := &(*s).(Image)
                 path  := strings.to_cstring(image.path, &app.thread_arena)
                 defer app.thread_arena.reset(rawptr(path))
                 image.data = rl.LoadImage(path)
@@ -251,10 +250,10 @@ draw :: (this: &Slide, app: &App) {
         if !s.ready {
             s.ready = true
             font := app.load_font(BASE_FONT_SIZE)
-            for i := 0; i < s.lines.count; i += 1 {
+            for _, line := range s.lines {
                 s.width = max(
                     s.width,
-                    rl.MeasureTextEx(font, strings.to_cstring(s.lines[i], &arena.temporary), f32(BASE_FONT_SIZE), 0.0).x
+                    rl.MeasureTextEx(font, strings.to_cstring(line, &arena.temporary), f32(BASE_FONT_SIZE), 0.0).x
                 )
             }
         }
@@ -267,8 +266,8 @@ draw :: (this: &Slide, app: &App) {
         }
 
         font := app.load_font(s32(size))
-        for i := 0; i < s.lines.count; i += 1 {
-            rl.DrawTextEx(font, strings.to_cstring(s.lines[i], &arena.temporary), position, size, 0.0, FOREGROUND)
+        for _, line := range s.lines {
+            rl.DrawTextEx(font, strings.to_cstring(line, &arena.temporary), position, size, 0.0, FOREGROUND)
             position.y += size
         }
 
@@ -313,7 +312,7 @@ draw :: (this: &Slide, app: &App) {
             segments    := 12
             orbitRadius := size * 0.5
             dotRadius   := size * 0.08
-            for i := 0; i < segments; i += 1 {
+            for i := range segments {
                 angle    := baseAngle + (f32(i) / f32(segments)) * 360.0
                 position := center + rl.Vector2 {orbitRadius}.rotate(angle * DEG2RAD)
                 rl.DrawCircleV(position, dotRadius, rl.Fade(SPINNER_COLOR, f32(i + 1) / f32(segments)))
