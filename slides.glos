@@ -10,9 +10,6 @@ BASE_FONT_SIZE       :: 60
 MAXIMUM_LOADED_FONTS :: 20
 
 main :: () {
-    checkpoint := arena.default.alloc(0)
-    defer arena.default.reset(checkpoint)
-
     rl.SetConfigFlags(.WINDOW_RESIZABLE)
     rl.InitWindow(800, 600, "Slides")
     rl.SetExitKey(.Q)
@@ -21,11 +18,12 @@ main :: () {
     app: App
     defer app.free()
 
+    checkpoint := app.arena.alloc(0)!
     if os.args.count == 2 {
         app.load_file(os.args[1])
     }
 
-    message: &char = "Drag and Drop slideshow file"
+    message: &C.char = "Drag and Drop slideshow file"
     message_width := rl.MeasureTextEx(app.load_font(BASE_FONT_SIZE), message, f32(BASE_FONT_SIZE), 0.0).x
 
     current := 0
@@ -91,7 +89,7 @@ main :: () {
                 }
                 app.slides.count = 0
 
-                arena.default.reset(checkpoint)
+                app.arena.rewind(checkpoint)
                 app.load_file(strings.from_cstring(*list.paths))
             }
         }
@@ -104,6 +102,8 @@ App :: struct {
 
     thread:       pthread.Pthread
     thread_arena: arena.Arena
+
+    arena:  arena.Arena
 }
 
 free :: (this: &App) {
@@ -119,18 +119,16 @@ free :: (this: &App) {
 
     this.stop_worker()
     this.thread_arena.free()
+    this.arena.free()
 }
 
 load_file :: (this: &App, path: string) {
-    contents, ok := os.read_entire_file(path)
-    if !ok then return
+    contents, err := os.read_file(path, allocator = &this.arena)
+    if err != null then return
 
     text: &Text
-    for contents := string(contents); contents.count != 0 {
-        line: string
-        line, contents, _ = strings.split(contents, '\n')
-
-        if line.count == 0 {
+    for _, line := range (strings.Split {string(contents), '\n'}) {
+        if line == "" {
             text = null
             continue
         }
@@ -160,20 +158,20 @@ load_file :: (this: &App, path: string) {
 }
 
 load_font :: (this: &App, size: s32) -> rl.Font {
-    for i, f := range this.fonts {
+    for _, f := range this.fonts {
         if diff(f.baseSize, size) <= 20 {
             return f
         }
     }
 
     if this.fonts.count > MAXIMUM_LOADED_FONTS {
-        for i := range MAXIMUM_LOADED_FONTS..this.fonts.count {
-            rl.UnloadFont(this.fonts[i])
+        for _, f := range this.fonts[MAXIMUM_LOADED_FONTS..] {
+            rl.UnloadFont(f)
         }
         this.fonts.count = MAXIMUM_LOADED_FONTS
     }
 
-    f := rl.LoadFontFromMemory(".ttf", FONT.data, s32(FONT.count) + 1, size, null, 0)
+    f := rl.LoadFontFromMemory(".ttf", &C.char(FONT.data), s32(FONT.count) + 1, size, null, 0)
     if rl.IsFontValid(f) {
         rl.GenTextureMipmaps(&f.texture)
         rl.SetTextureFilter(f.texture, .TRILINEAR)
@@ -203,11 +201,11 @@ start_worker :: (this: &App) {
 
     worker :: (arg: rawptr) -> rawptr {
         app := &App(arg)
-        for i, s := range &app.slides {
+        for _, s := range &app.slides {
             if *s == Image {
                 image := &(*s).(Image)
-                path  := strings.to_cstring(image.path, &app.thread_arena)
-                defer app.thread_arena.reset(rawptr(path))
+                path  := strings.to_cstring(image.path, allocator = &app.thread_arena)!
+                defer app.thread_arena.rewind(rawptr(path))
                 image.data = rl.LoadImage(path)
             }
         }
@@ -221,8 +219,7 @@ Slide :: union {
 }
 
 free :: (this: &Slide) {
-    s := *this
-    if s == {
+    if s := *this; s == {
     case Image
         data := s.data
         if data == {
@@ -239,8 +236,8 @@ free :: (this: &Slide) {
 }
 
 draw :: (this: &Slide, app: &App) {
-    checkpoint := arena.temporary.alloc(0)
-    defer arena.temporary.reset(checkpoint)
+    checkpoint := temporary_allocator.alloc(0)!
+    defer temporary_allocator.rewind(checkpoint)
 
     w := f32(rl.GetScreenWidth())
     h := f32(rl.GetScreenHeight())
@@ -253,7 +250,7 @@ draw :: (this: &Slide, app: &App) {
             for _, line := range s.lines {
                 s.width = max(
                     s.width,
-                    rl.MeasureTextEx(font, strings.to_cstring(line, &arena.temporary), f32(BASE_FONT_SIZE), 0.0).x
+                    rl.MeasureTextEx(font, strings.to_cstring(line, allocator = temporary_allocator)!, f32(BASE_FONT_SIZE), 0.0).x
                 )
             }
         }
@@ -267,7 +264,7 @@ draw :: (this: &Slide, app: &App) {
 
         font := app.load_font(s32(size))
         for _, line := range s.lines {
-            rl.DrawTextEx(font, strings.to_cstring(line, &arena.temporary), position, size, 0.0, FOREGROUND)
+            rl.DrawTextEx(font, strings.to_cstring(line, allocator = temporary_allocator)!, position, size, 0.0, FOREGROUND)
             position.y += size
         }
 

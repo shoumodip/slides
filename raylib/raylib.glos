@@ -1,45 +1,45 @@
 extern {
     #library "raylib_linux"
 
-    TraceLog :: (logLevel: TraceLogLevel, text: &char, ...)
-    InitWindow :: (width: s32, height: s32, title: &char)
+    TraceLog :: (logLevel: TraceLogLevel, text: &C.char, ...)
+    InitWindow :: (width: C.int, height: C.int, title: &C.char)
     CloseWindow :: ()
     WindowShouldClose :: () -> bool
     BeginDrawing :: ()
     EndDrawing :: ()
 
-    Fade :: (color: Color, alpha: f32) -> Color
+    Fade :: (color: Color, alpha: C.float) -> Color
     ClearBackground :: (color: Color)
 
-    DrawCircleV :: (center: Vector2, radius: f32, color: Color)
+    DrawCircleV :: (center: Vector2, radius: C.float, color: Color)
 
-    GetFrameTime :: () -> f32
+    GetFrameTime :: () -> C.float
 
     IsKeyReleased :: (key: Key) -> bool
     IsMouseButtonReleased :: (button: MouseButton) -> bool
 
-    LoadFontFromMemory :: (fileType: &char, fileData: &char, dataSize: s32, fontSize: s32, codepoints: &s32, codepointCount: s32) -> Font
+    LoadFontFromMemory :: (fileType: &C.char, fileData: &C.char, dataSize: C.int, fontSize: C.int, codepoints: &C.int, codepointCount: C.int) -> Font
     IsFontValid :: (font: Font) -> bool
     UnloadFont :: (font: Font)
 
-    DrawTextEx :: (font: Font, text: &char, position: Vector2, fontSize: f32, spacing: f32, tint: Color)
-    MeasureTextEx :: (font: Font, text: &char, fontSize: f32, spacing: f32) -> Vector2
+    DrawTextEx :: (font: Font, text: &C.char, position: Vector2, fontSize: C.float, spacing: C.float, tint: Color)
+    MeasureTextEx :: (font: Font, text: &C.char, fontSize: C.float, spacing: C.float) -> Vector2
 
     GenTextureMipmaps :: (texture: &Texture2D)
     SetTextureFilter :: (texture: Texture2D, filter: TextureFilter)
     LoadTextureFromImage :: (image: Image) -> Texture2D
-    DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: f32, scale: f32, tint: Color)
+    DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: C.float, scale: C.float, tint: Color)
     UnloadTexture :: (font: Texture)
 
-    LoadImage :: (fileName: &char) -> Image
+    LoadImage :: (fileName: &C.char) -> Image
     UnloadImage :: (font: Image)
     IsImageValid :: (image: Image) -> bool
 
     SetConfigFlags :: (flags: ConfigFlags)
     SetExitKey :: (key: Key)
 
-    GetScreenWidth :: () -> s32
-    GetScreenHeight :: () -> s32
+    GetScreenWidth :: () -> C.int
+    GetScreenHeight :: () -> C.int
     GetMousePosition :: () -> Vector2
 
     IsFileDropped :: () -> bool
@@ -48,26 +48,21 @@ extern {
 }
 
 Vector2 :: struct {
-    x: f32
-    y: f32
+    x: C.float
+    y: C.float
 }
 
 operator + :: (this: Vector2, that: Vector2) -> Vector2 {
     return {this.x + that.x, this.y + that.y}
 }
 
-rotate :: (this: Vector2, angle: f32) -> Vector2 {
-    cosres := cosf(angle)
-    sinres := sinf(angle)
+rotate :: (this: Vector2, angle: C.float) -> Vector2 {
+    cosres := angle.cos()
+    sinres := angle.sin()
     return {this.x*cosres - this.y*sinres, this.x*sinres + this.y*cosres}
-
-    extern {
-        cosf :: (_: f32) -> f32
-        sinf :: (_: f32) -> f32
-    }
 }
 
-TraceLogLevel :: enum s32 {
+TraceLogLevel :: enum C.int {
     ALL = 0
     TRACE
     DEBUG
@@ -79,23 +74,23 @@ TraceLogLevel :: enum s32 {
 }
 
 Rectangle :: struct {
-    x:      f32
-    y:      f32
-    width:  f32
-    height: f32
+    x:      C.float
+    y:      C.float
+    width:  C.float
+    height: C.float
 }
 
 Color :: struct {
-    r: u8
-    g: u8
-    b: u8
-    a: u8
+    r: C.unsigned_char
+    g: C.unsigned_char
+    b: C.unsigned_char
+    a: C.unsigned_char
 }
 
 Font :: struct {
-    baseSize:     s32
-    glyphCount:   s32
-    glyphPadding: s32
+    baseSize:     C.int
+    glyphCount:   C.int
+    glyphPadding: C.int
     texture:      Texture2D
     recs:         &Rectangle
     glyphs:       &GlyphInfo
@@ -103,36 +98,36 @@ Font :: struct {
 
 Image :: struct {
     data:    rawptr
-    width:   s32
-    height:  s32
-    mipmaps: s32
-    format:  s32
+    width:   C.int
+    height:  C.int
+    mipmaps: C.int
+    format:  C.int
 }
 
 Texture :: struct {
-    id:      u32
-    width:   s32
-    height:  s32
-    mipmaps: s32
-    format:  s32
+    id:      C.unsigned_int
+    width:   C.int
+    height:  C.int
+    mipmaps: C.int
+    format:  C.int
 }
 
 Texture2D :: Texture
 
 GlyphInfo :: struct {
-    value:    s32
-    offsetX:  s32
-    offsetY:  s32
-    advanceX: s32
+    value:    C.int
+    offsetX:  C.int
+    offsetY:  C.int
+    advanceX: C.int
     image:    Image
 }
 
 
-ConfigFlags :: enum u32 {
+ConfigFlags :: enum C.unsigned_int {
     WINDOW_RESIZABLE = 0x00000004
 }
 
-TextureFilter :: enum s32 {
+TextureFilter :: enum C.int {
     POINT = 0
     BILINEAR
     TRILINEAR
@@ -141,7 +136,7 @@ TextureFilter :: enum s32 {
     ANISOTROPIC_16X
 }
 
-Key :: enum s32 {
+Key :: enum C.int {
     H     = 72
     J     = 74
     K     = 75
@@ -153,7 +148,7 @@ Key :: enum s32 {
     UP    = 265
 }
 
-MouseButton :: enum s32 {
+MouseButton :: enum C.int {
     LEFT    = 0
     RIGHT   = 1
     MIDDLE  = 2
@@ -164,7 +159,10 @@ MouseButton :: enum s32 {
 }
 
 FilePathList :: struct {
-    capacity: u32
-    count:    u32
-    paths:    &&char
+    capacity: C.unsigned_int
+    count:    C.unsigned_int
+    paths:    &&C.char
 }
+
+C    :: #import "C"
+math :: #import "math"
