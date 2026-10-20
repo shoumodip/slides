@@ -99,11 +99,8 @@ main :: () {
 App :: struct {
     fonts:  [..]rl.Font
     slides: [..]Slide
-
-    thread:       pthread.Pthread
-    thread_arena: arena.Arena
-
     arena:  arena.Arena
+    thread: pthread.Pthread
 }
 
 free :: (this: &App) {
@@ -118,7 +115,6 @@ free :: (this: &App) {
     this.slides.free()
 
     this.stop_worker()
-    this.thread_arena.free()
     this.arena.free()
 }
 
@@ -171,7 +167,7 @@ load_font :: (this: &App, size: s32) -> rl.Font {
         this.fonts.count = MAXIMUM_LOADED_FONTS
     }
 
-    f := rl.LoadFontFromMemory(".ttf", &C.char(FONT.data), s32(FONT.count) + 1, size, null, 0)
+    f := rl.LoadFontFromMemory(".ttf", FONT.data, s32(FONT.count) + 1, size, null, 0)
     if rl.IsFontValid(f) {
         rl.GenTextureMipmaps(&f.texture)
         rl.SetTextureFilter(f.texture, .TRILINEAR)
@@ -189,11 +185,6 @@ stop_worker :: (this: &App) {
 }
 
 start_worker :: (this: &App) {
-    if this.thread_arena.capacity == 0 {
-        this.thread_arena.capacity = 64 * 1024
-    }
-    this.thread_arena.head = 0
-
     if bool(this.thread.create(null, worker, rawptr(this))) {
         rl.TraceLog(.ERROR, "Could not start worker thread. Executing it on the main thread")
         worker(rawptr(this))
@@ -204,8 +195,8 @@ start_worker :: (this: &App) {
         for _, s := range &app.slides {
             if *s == Image {
                 image := &(*s).(Image)
-                path  := strings.to_cstring(image.path, allocator = &app.thread_arena)!
-                defer app.thread_arena.rewind(rawptr(path))
+                path  := strings.to_cstring(image.path, allocator = &app.arena)!
+                defer app.arena.rewind(rawptr(path))
                 image.data = rl.LoadImage(path)
             }
         }
@@ -311,7 +302,7 @@ draw :: (this: &Slide, app: &App) {
             dotRadius   := size * 0.08
             for i := range segments {
                 angle    := baseAngle + (f32(i) / f32(segments)) * 360.0
-                position := center + rl.Vector2 {orbitRadius}.rotate(angle * DEG2RAD)
+                position := center + rl.Vector2 {orbitRadius}.Rotate(angle * DEG2RAD)
                 rl.DrawCircleV(position, dotRadius, rl.Fade(SPINNER_COLOR, f32(i + 1) / f32(segments)))
 
                 PI      :: 3.14159265358979323846
@@ -355,5 +346,5 @@ os      :: #import "os"
 arena   :: #import "arena"
 strings :: #import "strings"
 
-rl      :: #import "raylib"
+rl      :: #import "vendor/raylib"
 pthread :: #import "pthread"
