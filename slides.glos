@@ -123,7 +123,9 @@ load_file :: (this: &App, path: string) {
     if err != null then return
 
     text: &Text
-    for _, line := range (strings.Split {string(contents), '\n'}) {
+    for contents := string(contents); contents != "" {
+        line: string
+        line, contents, _ = strings.split(contents, '\n')
         if line == "" {
             text = null
             continue
@@ -346,5 +348,5 @@ os      :: #import "os"
 arena   :: #import "arena"
 strings :: #import "strings"
 
-rl      :: #import "vendor/raylib"
+rl      :: #import "raylib"
 pthread :: #import "pthread"
